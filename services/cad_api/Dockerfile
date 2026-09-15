@@ -6,7 +6,11 @@ WORKDIR /app
 
 COPY services/cad_api/requirements.txt /app/services/cad_api/requirements.txt
 
-RUN python -m pip install --no-cache-dir --upgrade pip && python -m pip install --no-cache-dir -r /app/services/cad_api/requirements.txt
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgl1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -m pip install --no-cache-dir --upgrade pip \
+    && python -m pip install --no-cache-dir -r /app/services/cad_api/requirements.txt
 
 COPY drawing-engine /app/drawing-engine
 COPY services/cad_api /app/services/cad_api
