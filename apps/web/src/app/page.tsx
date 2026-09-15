@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import CadViewer from "@/components/cad/CadViewer";
+import { trackEvent } from "@/lib/analytics";
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
+  const [generating, setGenerating] = useState(false);
 
   const handleFileChange = (
     event: React.ChangeEvent<HTMLInputElement>
@@ -24,6 +26,61 @@ export default function Home() {
     }
 
     setFile(selectedFile);
+
+    trackEvent("step_upload", {
+      file_type: extension,
+    });
+  };
+
+  const generateDrawing = async () => {
+    if (!file) return;
+
+    setGenerating(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch(
+        "http://127.0.0.1:8000/drawings",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Drawing generation failed.");
+      }
+
+      const blob = await response.blob();
+      trackEvent("drawing_generated", {
+        file_type: file.name.toLowerCase().endsWith(".stp")
+          ? "stp"
+          : "step",
+      });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${file.name.replace(/\.(step|stp)$/i, "")}_drawing.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      trackEvent("pdf_download", {
+        file_type: file.name.toLowerCase().endsWith(".stp")
+        ? "stp"
+        : "step",
+      });
+      link.remove();
+
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(error);
+      alert("Failed to generate drawing.");
+    } finally {
+      setGenerating(false);
+    }
   };
 
   return (
@@ -52,9 +109,22 @@ export default function Home() {
           />
 
           {file && (
-            <p className="mt-3 text-sm text-gray-600">
-              Selected: {file.name}
-            </p>
+            <div className="mt-4">
+              <p className="text-sm text-gray-600">
+                Selected: {file.name}
+              </p>
+
+              <button
+                type="button"
+                onClick={generateDrawing}
+                disabled={generating}
+                className="mt-4 rounded-lg bg-black px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {generating
+                  ? "Generating Drawing..."
+                  : "Generate Drawing PDF"}
+              </button>
+            </div>
           )}
         </div>
 

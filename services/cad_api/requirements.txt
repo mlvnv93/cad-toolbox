@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+python-multipart
+cadquery==2.8.0
+svglib
+reportlab
