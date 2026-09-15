@@ -41,9 +41,7 @@ export default function Home() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch(
-        "http://127.0.0.1:8000/drawings",
-        {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_DRAWING_API_URL}/drawings`, {
           method: "POST",
           body: formData,
         }
