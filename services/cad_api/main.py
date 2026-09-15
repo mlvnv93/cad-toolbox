@@ -5,6 +5,7 @@ import tempfile
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import Response
+from fastapi.middleware.cors import CORSMiddleware
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DRAWING_ENGINE = PROJECT_ROOT / "drawing-engine"
@@ -21,6 +22,16 @@ app = FastAPI(
     version="0.1.0",
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/health")
 def health():
