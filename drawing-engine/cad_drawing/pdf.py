@@ -6,6 +6,8 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 
+from .model import DrawingModel
+
 
 def draw_svg(pdf, svg_file, x, y, width, height):
     drawing = svg2rlg(str(svg_file))
@@ -24,6 +26,7 @@ def create_pdf(
     views: dict[str, Path],
     output_file: str | Path,
     part_name: str,
+    drawing_model: DrawingModel | None = None,
 ):
     output_file = Path(output_file)
 
@@ -33,6 +36,7 @@ def create_pdf(
     pdf = canvas.Canvas(
         str(output_file),
         pagesize=A4,
+        pageCompression=0,
     )
 
     pdf.setTitle(f"{part_name} - CAD Toolbox Drawing")
@@ -108,10 +112,13 @@ def create_pdf(
         block_y + 11 * mm,
         f"PART: {part_name}",
     )
+    scale_label = drawing_model.scale.label if drawing_model else "FIT"
+    scale_unit = drawing_model.scale.unit.lower() if drawing_model else "mm"
+
     pdf.drawString(
         block_x + 3 * mm,
         block_y + 5 * mm,
-        "SCALE: FIT    UNITS: mm",
+        f"SCALE: {scale_label}    UNITS: {scale_unit}",
     )
 
     pdf.showPage()

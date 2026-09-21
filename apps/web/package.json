@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --test --experimental-strip-types src/lib/cad/*.test.ts",
+    "test:occt-wasm": "node --test --experimental-strip-types src/lib/cad/occt-wasm-capability.test.ts",
+    "test:m5": "node --test --experimental-strip-types src/lib/cad/thickness.test.ts src/lib/cad/occt-wasm-thickness.test.ts"
   },
   "dependencies": {
     "next": "16.3.4",
@@ -21,6 +24,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/three": "0.185.1",
+    "occt-wasm": "5.3.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "tailwindcss": "^4",
