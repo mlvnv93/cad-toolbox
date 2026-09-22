@@ -84,3 +84,30 @@ def compress_cad_files(
             )
 
     return results
+
+
+def bundle_archives(
+    input_files: Iterable[str | Path],
+    output_file: str | Path,
+) -> Path:
+    """Bundle converted archive files into one deterministic ZIP file."""
+    archive = Path(output_file)
+    archive.parent.mkdir(parents=True, exist_ok=True)
+    used_names: set[str] = set()
+
+    with ZipFile(archive, mode="w", compression=ZIP_DEFLATED) as zip_file:
+        for input_file in input_files:
+            source = Path(input_file)
+            entry_name = source.name
+            suffix = 2
+            while entry_name in used_names:
+                entry_name = f"{source.stem}_{suffix}{source.suffix}"
+                suffix += 1
+            used_names.add(entry_name)
+            entry = ZipInfo(entry_name, date_time=(1980, 1, 1, 0, 0, 0))
+            entry.compress_type = ZIP_DEFLATED
+            entry.create_system = 3
+            entry.external_attr = 0o600 << 16
+            zip_file.writestr(entry, source.read_bytes())
+
+    return archive

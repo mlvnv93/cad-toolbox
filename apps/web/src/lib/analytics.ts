@@ -1,7 +1,10 @@
 export type AnalyticsEvent =
   | "step_upload"
   | "drawing_generated"
-  | "pdf_download";
+  | "pdf_download"
+  | "cad_convert_start"
+  | "cad_convert_success"
+  | "cad_convert_error";
 
 export function trackEvent(
   event: AnalyticsEvent,

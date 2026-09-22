@@ -1,6 +1,7 @@
 fastapi
 uvicorn[standard]
 python-multipart
+httpx2
 cadquery==2.8.0
 svglib
 reportlab
