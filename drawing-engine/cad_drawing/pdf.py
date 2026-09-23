@@ -2,11 +2,11 @@ from pathlib import Path
 
 from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPDF
-from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 
 from .model import DrawingModel
+from .sheet import Sheet
 
 
 def draw_svg(pdf, svg_file, x, y, width, height):
@@ -30,12 +30,14 @@ def create_pdf(
 ):
     output_file = Path(output_file)
 
-    page_width, page_height = A4
+    sheet = drawing_model.sheet if drawing_model else Sheet()
+    page_width = sheet.width_mm * mm
+    page_height = sheet.height_mm * mm
     margin = 10 * mm
 
     pdf = canvas.Canvas(
         str(output_file),
-        pagesize=A4,
+        pagesize=(page_width, page_height),
         pageCompression=0,
     )
 
