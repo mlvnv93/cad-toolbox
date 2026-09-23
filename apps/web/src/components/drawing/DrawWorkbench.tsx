@@ -60,6 +60,8 @@ export default function DrawWorkbench() {
   const [titleBlockOpen, setTitleBlockOpen] = useState(false);
   const [title, setTitle] = useState("800000182_1");
   const [partNumber, setPartNumber] = useState("PART-001");
+  const [paperSize, setPaperSize] = useState("A4");
+  const [orientation, setOrientation] = useState<"portrait" | "landscape">("portrait");
   const [exporting, setExporting] = useState(false);
 
   const addView = (view: ViewName) => {
@@ -99,7 +101,11 @@ export default function DrawWorkbench() {
     if (!file || exporting) return;
     setExporting(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_DRAWING_API_URL}/drawings`, { method: "POST", body: (() => { const data = new FormData(); data.append("file", file); return data; })() });
+      const data = new FormData();
+      data.append("file", file);
+      data.append("paper_size", paperSize);
+      data.append("orientation", orientation);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_DRAWING_API_URL}/drawings`, { method: "POST", body: data });
       if (!response.ok) throw new Error("Drawing export failed");
       const url = URL.createObjectURL(await response.blob());
       const link = document.createElement("a");
@@ -141,8 +147,8 @@ export default function DrawWorkbench() {
             </PanelSection>
             <PanelSection title="Sheet">
               <SettingRow label="Units"><select><option>Millimetres (mm)</option><option>Inches (in)</option></select></SettingRow>
-              <SettingRow label="Paper size"><select><option>A3</option><option>A4</option><option>A2</option></select></SettingRow>
-              <SettingRow label="Orientation"><span className="draw-segmented"><button className="is-selected" type="button">Landscape</button><button type="button">Portrait</button></span></SettingRow>
+              <SettingRow label="Paper size"><select value={paperSize} onChange={(event) => setPaperSize(event.target.value)}><option value="A4">A4</option><option value="A3">A3</option><option value="A2">A2</option><option value="A1">A1</option></select></SettingRow>
+              <SettingRow label="Orientation"><span className="draw-segmented"><button className={orientation === "portrait" ? "is-selected" : ""} type="button" onClick={() => setOrientation("portrait")}>Portrait</button><button className={orientation === "landscape" ? "is-selected" : ""} type="button" onClick={() => setOrientation("landscape")}>Landscape</button></span></SettingRow>
               <SettingRow label="Drawing scale"><select><option>Automatic · 1:1</option><option>1:2</option><option>1:5</option><option>1:10</option><option>2:1</option></select></SettingRow>
               <SettingRow label="Template"><select><option>CAD Toolbox — A3</option><option>Plain sheet</option></select></SettingRow>
               <SettingRow label="Projection"><select><option>Third angle</option><option>First angle</option></select></SettingRow>
@@ -156,7 +162,7 @@ export default function DrawWorkbench() {
         </aside>
 
         <section className="drawing-stage" aria-label="Technical drawing preview">
-          <div className="drawing-stage-topline"><span>DRAWING PREVIEW</span><span>A3 · LANDSCAPE · mm</span></div>
+          <div className="drawing-stage-topline"><span>DRAWING PREVIEW</span><span>{paperSize} · {orientation.toUpperCase()} · mm</span></div>
           <div className="drawing-sheet-wrap">
             <svg className="drawing-sheet" viewBox="0 0 820 560" role="img" aria-label="Technical drawing sheet. Drop views here to place them." onClick={selectSheetPoint} onPointerMove={movePlacedView} onPointerUp={() => setMovingView(null)} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); if (draggedView) addView(draggedView); }}>
               <rect className="sheet-paper" x="18" y="18" width="784" height="524" />

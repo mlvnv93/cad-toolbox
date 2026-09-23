@@ -1,11 +1,18 @@
 import io
 from pathlib import Path
+from types import SimpleNamespace
 from zipfile import ZipFile
 
 import pytest
 from fastapi.testclient import TestClient
 
 from services.cad_api import main
+
+
+DRAWING_SCALE = SimpleNamespace(
+    label="1:1",
+    unit="MM",
+)
 
 
 client = TestClient(main.app)
@@ -123,3 +130,64 @@ def test_convert_reports_conversion_failure(monkeypatch: pytest.MonkeyPatch) -> 
 
     assert response.status_code == 422
     assert response.json()["detail"] == "CAD conversion failed: part.step: bad geometry"
+
+
+@pytest.mark.parametrize(
+    ("data", "expected_paper_size", "expected_orientation"),
+    [
+        ({}, "A4", "portrait"),
+        ({"paper_size": "A4", "orientation": "landscape"}, "A4", "landscape"),
+        ({"paper_size": "A3", "orientation": "landscape"}, "A3", "landscape"),
+    ],
+)
+def test_drawings_pass_selected_sheet_to_existing_exporter(
+    monkeypatch: pytest.MonkeyPatch,
+    data: dict[str, str],
+    expected_paper_size: str,
+    expected_orientation: str,
+) -> None:
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(main, "import_step", lambda _: object())
+    monkeypatch.setattr(main, "export_views", lambda *_: {})
+    monkeypatch.setattr(main, "calculate_bounding_box", lambda _: object())
+    monkeypatch.setattr(main, "calculate_automatic_scale", lambda *_: DRAWING_SCALE)
+
+    def write_pdf(*args: object, **kwargs: object) -> None:
+        captured["drawing_model"] = args[3]
+        Path(args[1]).parent.mkdir(parents=True, exist_ok=True)
+        Path(args[1]).write_bytes(b"%PDF")
+
+    monkeypatch.setattr(main, "create_pdf", write_pdf)
+
+    response = client.post(
+        "/drawings",
+        files={"file": ("part.step", b"valid STEP", "application/octet-stream")},
+        data=data,
+    )
+
+    assert response.status_code == 200
+    drawing_model = captured["drawing_model"]
+    assert drawing_model.sheet.paper_size == expected_paper_size
+    assert drawing_model.sheet.orientation == expected_orientation
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("paper_size", "A0", "Unsupported paper size"),
+        ("orientation", "diagonal", "Unsupported orientation"),
+    ],
+)
+def test_drawings_reject_invalid_sheet_configuration(
+    field: str,
+    value: str,
+    message: str,
+) -> None:
+    response = client.post(
+        "/drawings",
+        files={"file": ("part.step", b"valid STEP", "application/octet-stream")},
+        data={field: value},
+    )
+
+    assert response.status_code == 400
+    assert message in response.json()["detail"]

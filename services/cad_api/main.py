@@ -14,6 +14,7 @@ DRAWING_ENGINE = PROJECT_ROOT / "drawing-engine"
 sys.path.insert(0, str(DRAWING_ENGINE))
 
 from cad_drawing.step import import_step
+from cad_drawing.bounds import calculate_bounding_box
 from cad_drawing.conversion import (
     UnsupportedConversionFormat,
     available_formats,
@@ -23,6 +24,9 @@ from cad_drawing.conversion import (
 from cad_drawing.views import export_views
 from cad_drawing.pdf import create_pdf
 from cad_drawing.archive import bundle_archives, compress_cad_files
+from cad_drawing.model import DrawingModel
+from cad_drawing.scale import calculate_automatic_scale
+from cad_drawing.sheet import Sheet
 
 
 app = FastAPI(
@@ -176,7 +180,11 @@ async def convert(
 
 
 @app.post("/drawings")
-async def generate_drawing(file: UploadFile = File(...)):
+async def generate_drawing(
+    file: UploadFile = File(...),
+    paper_size: str = Form("A4"),
+    orientation: str = Form("portrait"),
+):
     filename = file.filename or ""
 
     if not filename.lower().endswith((".step", ".stp")):
@@ -184,6 +192,11 @@ async def generate_drawing(file: UploadFile = File(...)):
             status_code=400,
             detail="Only STEP or STP files are supported.",
         )
+
+    try:
+        sheet = Sheet(paper_size=paper_size, orientation=orientation)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
@@ -197,7 +210,16 @@ async def generate_drawing(file: UploadFile = File(...)):
         try:
             model = import_step(step_path)
             views = export_views(model, output_dir)
-            create_pdf(views, pdf_path, Path(filename).stem)
+            scale = calculate_automatic_scale(
+                calculate_bounding_box(model),
+                sheet.drawing_area,
+            )
+            create_pdf(
+                views,
+                pdf_path,
+                Path(filename).stem,
+                DrawingModel(scale=scale, sheet=sheet),
+            )
         except Exception as exc:
             raise HTTPException(
                 status_code=500,

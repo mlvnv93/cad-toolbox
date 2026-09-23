@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 import pytest
 
@@ -77,3 +78,46 @@ def test_default_sheet_generates_pdf_from_real_step(tmp_path: Path) -> None:
 
     assert pdf_file.exists()
     assert pdf_file.stat().st_size > 0
+
+
+@pytest.mark.parametrize(
+    ("sheet", "expected_dimensions"),
+    [
+        (Sheet(), (210, 297)),
+        (Sheet(paper_size="A3", orientation="landscape"), (420, 297)),
+    ],
+)
+def test_pdf_page_dimensions_follow_selected_sheet(
+    tmp_path: Path,
+    sheet: Sheet,
+    expected_dimensions: tuple[int, int],
+) -> None:
+    svg = '<svg xmlns="http://www.w3.org/2000/svg" width="10mm" height="10mm"><rect width="10" height="10" /></svg>'
+    views = {}
+    for name in ("front", "top", "right"):
+        view_file = tmp_path / f"{name}.svg"
+        view_file.write_text(svg, encoding="utf-8")
+        views[name] = view_file
+
+    imported_model = import_step(STEP_FILE)
+    model = DrawingModel(
+        scale=calculate_automatic_scale(
+            calculate_bounding_box(imported_model),
+            Sheet().drawing_area,
+        ),
+        sheet=sheet,
+    )
+    pdf_file = tmp_path / "drawing.pdf"
+    create_pdf(views, pdf_file, "part", model)
+
+    pdf_text = pdf_file.read_bytes().decode("latin-1")
+    media_box = re.search(
+        r"/MediaBox\s+\[\s+0\s+0\s+([\d.]+)\s+([\d.]+)\s+\]",
+        pdf_text,
+    )
+    assert media_box is not None
+    page_width, page_height = (float(value) for value in media_box.groups())
+    expected_width = expected_dimensions[0] * 72 / 25.4
+    expected_height = expected_dimensions[1] * 72 / 25.4
+    assert page_width == pytest.approx(expected_width, abs=0.01)
+    assert page_height == pytest.approx(expected_height, abs=0.01)
