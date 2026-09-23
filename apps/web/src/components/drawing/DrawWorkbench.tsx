@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
+import { createDrawingExportRequest, type DrawingExportFormat } from "./draw-export";
 
 type ViewName = "Front" | "Back" | "Left" | "Right" | "Top" | "Bottom" | "Isometric";
 type DimensionType = "Linear" | "Angular" | "Diameter" | "Radius";
@@ -63,6 +64,7 @@ export default function DrawWorkbench() {
   const [paperSize, setPaperSize] = useState("A4");
   const [orientation, setOrientation] = useState<"portrait" | "landscape">("portrait");
   const [projectionType, setProjectionType] = useState("THIRD_ANGLE");
+  const [exportFormat, setExportFormat] = useState<DrawingExportFormat>("pdf");
   const [exporting, setExporting] = useState(false);
 
   const addView = (view: ViewName) => {
@@ -102,17 +104,20 @@ export default function DrawWorkbench() {
     if (!file || exporting) return;
     setExporting(true);
     try {
-      const data = new FormData();
-      data.append("file", file);
-      data.append("paper_size", paperSize);
-      data.append("orientation", orientation);
-      data.append("projection_type", projectionType);
-      const response = await fetch(`${process.env.NEXT_PUBLIC_DRAWING_API_URL}/drawings`, { method: "POST", body: data });
+      const request = createDrawingExportRequest(
+        process.env.NEXT_PUBLIC_DRAWING_API_URL,
+        exportFormat,
+        file,
+        paperSize,
+        orientation,
+        projectionType,
+      );
+      const response = await fetch(request.url, { method: "POST", body: request.body });
       if (!response.ok) throw new Error("Drawing export failed");
       const url = URL.createObjectURL(await response.blob());
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${title || "drawing"}.pdf`;
+      link.download = `${title || "drawing"}.${request.filenameExtension}`;
       link.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -222,7 +227,7 @@ export default function DrawWorkbench() {
           <div className="draw-toolbar-group"><ToolbarButton icon="⌁" label="Select" active /><ToolbarButton icon="✥" label="Pan" /><ToolbarButton icon="＋" label="Zoom" /><ToolbarButton icon="□" label="Fit" /></div>
           <div className="draw-toolbar-group"><ToolbarButton icon="◈" label="Shaded" active /><ToolbarButton icon="⌗" label="Hidden Lines" /><ToolbarButton icon="▧" label="Edges" /></div>
           <div className="draw-toolbar-group"><ToolbarButton icon="∥" label="Dimensions" active={showDimensions} onClick={() => setShowDimensions((show) => !show)} /><ToolbarButton icon="⌘" label="Annotations" active={showAnnotations} onClick={() => setShowAnnotations((show) => !show)} /></div>
-          <div className="draw-toolbar-group draw-toolbar-end"><ToolbarButton icon="▣" label="Screenshot" /><button className="draw-export-button" type="button" onClick={exportDrawing} disabled={exporting}>{exporting ? "Exporting..." : "Export PDF"}<span aria-hidden="true">↗</span></button></div>
+          <div className="draw-toolbar-group draw-toolbar-end"><ToolbarButton icon="▣" label="Screenshot" /><select aria-label="Export format" value={exportFormat} onChange={(event) => setExportFormat(event.target.value as DrawingExportFormat)} disabled={exporting}><option value="pdf">PDF</option><option value="dxf">DXF</option></select><button className="draw-export-button" type="button" onClick={exportDrawing} disabled={exporting}>{exporting ? "Exporting..." : `Export ${exportFormat.toUpperCase()}`}<span aria-hidden="true">↗</span></button></div>
         </nav>
       </div>
 
