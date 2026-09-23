@@ -30,6 +30,7 @@ from cad_drawing.model import DrawingModel
 from cad_drawing.projection import ProjectionType
 from cad_drawing.scale import calculate_automatic_scale
 from cad_drawing.sheet import Sheet
+from services.cad_api.preview import serialize_drawing_preview
 
 
 app = FastAPI(
@@ -180,6 +181,41 @@ async def convert(
             ),
             headers={"Content-Disposition": f'attachment; filename="{download_name}"'},
         )
+
+
+@app.post("/draw/preview")
+async def generate_drawing_preview(
+    file: UploadFile = File(...),
+    paper_size: str = Form("A4"),
+    orientation: str = Form("portrait"),
+    projection_type: str = Form("THIRD_ANGLE"),
+):
+    filename = file.filename or ""
+    if not filename.lower().endswith((".step", ".stp")):
+        raise HTTPException(status_code=400, detail="Only STEP or STP files are supported.")
+
+    try:
+        sheet = Sheet(paper_size=paper_size, orientation=orientation)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        projection = ProjectionType(projection_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Unsupported projection type: {projection_type}") from exc
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        step_path = temp_path / Path(filename).name
+        output_dir = temp_path / "output"
+        step_path.write_bytes(await file.read())
+        try:
+            model = import_step(step_path)
+            views = export_views(model, output_dir)
+            scale = calculate_automatic_scale(calculate_bounding_box(model), sheet.drawing_area)
+            drawing_model = DrawingModel(scale=scale, sheet=sheet, projection_type=projection)
+            return serialize_drawing_preview(views, drawing_model)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Drawing preview generation failed: {exc}") from exc
 
 
 @app.post("/drawings")
