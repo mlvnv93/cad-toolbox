@@ -15,6 +15,9 @@ export type DrawingPreview = {
   entities: DrawingPreviewEntity[];
   views: Record<DrawingViewKey, DrawingPreviewEntity[]>;
   view_positions: Record<DrawingViewKey, { x: number; y: number }>;
+  model_loaded?: boolean;
+  model_name?: string;
+  model_bounds_mm?: { x: number; y: number; z: number };
 };
 
 export function createDrawingPreviewRequest(apiUrl: string | undefined, file: File, paperSize: string, orientation: string, projectionType: string): { url: string; body: FormData } {
