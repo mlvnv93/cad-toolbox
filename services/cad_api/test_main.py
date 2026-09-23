@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from zipfile import ZipFile
 
 import pytest
+import ezdxf
 from fastapi.testclient import TestClient
 
 from services.cad_api import main
@@ -16,6 +17,7 @@ DRAWING_SCALE = SimpleNamespace(
 
 
 client = TestClient(main.app)
+STEP_FILE = Path(r"C:\Users\mlvnv\Downloads\800000182_1.stp")
 
 
 def test_convert_formats_returns_authoritative_registry() -> None:
@@ -189,6 +191,71 @@ def test_drawings_reject_invalid_sheet_configuration(
     response = client.post(
         "/drawings",
         files={"file": ("part.step", b"valid STEP", "application/octet-stream")},
+        data={field: value},
+    )
+
+    assert response.status_code == 400
+    assert message in response.json()["detail"]
+
+
+@pytest.mark.parametrize(
+    ("data", "expected_sheet", "expected_projection"),
+    [
+        ({}, (210, 297), "THIRD_ANGLE"),
+        (
+            {
+                "paper_size": "A3",
+                "orientation": "landscape",
+                "projection_type": "FIRST_ANGLE",
+            },
+            (420, 297),
+            "FIRST_ANGLE",
+        ),
+        ({"projection_type": "THIRD_ANGLE"}, (210, 297), "THIRD_ANGLE"),
+    ],
+)
+def test_dxf_endpoint_returns_real_step_dxf(
+    tmp_path: Path,
+    data: dict[str, str],
+    expected_sheet: tuple[int, int],
+    expected_projection: str,
+) -> None:
+    response = client.post(
+        "/draw/dxf",
+        files={"file": (STEP_FILE.name, STEP_FILE.read_bytes(), "model/step")},
+        data=data,
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/dxf"
+    assert ".dxf" in response.headers["content-disposition"]
+    assert response.content
+
+    dxf_file = tmp_path / "response.dxf"
+    dxf_file.write_bytes(response.content)
+    dxf = ezdxf.readfile(dxf_file)
+    assert len(list(dxf.modelspace())) > 0
+    assert dxf.header["$INSUNITS"] == 4
+    assert expected_sheet in {(210, 297), (420, 297)}
+    assert expected_projection in {"FIRST_ANGLE", "THIRD_ANGLE"}
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("paper_size", "A0", "Unsupported paper size"),
+        ("orientation", "diagonal", "Unsupported orientation"),
+        ("projection_type", "SECOND_ANGLE", "Unsupported projection type"),
+    ],
+)
+def test_dxf_endpoint_rejects_invalid_configuration(
+    field: str,
+    value: str,
+    message: str,
+) -> None:
+    response = client.post(
+        "/draw/dxf",
+        files={"file": (STEP_FILE.name, b"not used", "model/step")},
         data={field: value},
     )
 

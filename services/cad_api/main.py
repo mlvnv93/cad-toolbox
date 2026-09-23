@@ -24,6 +24,8 @@ from cad_drawing.conversion import (
 from cad_drawing.views import export_views
 from cad_drawing.pdf import create_pdf
 from cad_drawing.archive import bundle_archives, compress_cad_files
+from cad_drawing.drawing_views import drawing_document_from_views
+from cad_drawing.dxf import write_dxf
 from cad_drawing.model import DrawingModel
 from cad_drawing.projection import ProjectionType
 from cad_drawing.scale import calculate_automatic_scale
@@ -247,6 +249,73 @@ async def generate_drawing(
             headers={
                 "Content-Disposition": (
                     f'attachment; filename="{pdf_path.name}"'
+                )
+            },
+        )
+
+
+@app.post("/draw/dxf")
+async def generate_dxf(
+    file: UploadFile = File(...),
+    paper_size: str = Form("A4"),
+    orientation: str = Form("portrait"),
+    projection_type: str = Form("THIRD_ANGLE"),
+):
+    filename = file.filename or ""
+
+    if not filename.lower().endswith((".step", ".stp")):
+        raise HTTPException(
+            status_code=400,
+            detail="Only STEP or STP files are supported.",
+        )
+
+    try:
+        sheet = Sheet(paper_size=paper_size, orientation=orientation)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        projection = ProjectionType(projection_type)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported projection type: {projection_type}",
+        ) from exc
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        step_path = temp_path / filename
+        output_dir = temp_path / "output"
+        dxf_path = output_dir / f"{Path(filename).stem}_drawing.dxf"
+
+        with step_path.open("wb") as destination:
+            shutil.copyfileobj(file.file, destination)
+
+        try:
+            model = import_step(step_path)
+            views = export_views(model, output_dir)
+            scale = calculate_automatic_scale(
+                calculate_bounding_box(model),
+                sheet.drawing_area,
+            )
+            drawing_model = DrawingModel(
+                scale=scale,
+                sheet=sheet,
+                projection_type=projection,
+            )
+            document = drawing_document_from_views(views, drawing_model)
+            write_dxf(document, dxf_path)
+        except Exception as exc:
+            raise HTTPException(
+                status_code=500,
+                detail=f"DXF generation failed: {exc}",
+            ) from exc
+
+        return Response(
+            content=dxf_path.read_bytes(),
+            media_type="application/dxf",
+            headers={
+                "Content-Disposition": (
+                    f'attachment; filename="{dxf_path.name}"'
                 )
             },
         )
