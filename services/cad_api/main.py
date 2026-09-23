@@ -25,6 +25,7 @@ from cad_drawing.views import export_views
 from cad_drawing.pdf import create_pdf
 from cad_drawing.archive import bundle_archives, compress_cad_files
 from cad_drawing.model import DrawingModel
+from cad_drawing.projection import ProjectionType
 from cad_drawing.scale import calculate_automatic_scale
 from cad_drawing.sheet import Sheet
 
@@ -184,6 +185,7 @@ async def generate_drawing(
     file: UploadFile = File(...),
     paper_size: str = Form("A4"),
     orientation: str = Form("portrait"),
+    projection_type: str = Form("THIRD_ANGLE"),
 ):
     filename = file.filename or ""
 
@@ -197,6 +199,13 @@ async def generate_drawing(
         sheet = Sheet(paper_size=paper_size, orientation=orientation)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        projection = ProjectionType(projection_type)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported projection type: {projection_type}",
+        ) from exc
 
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
@@ -218,7 +227,11 @@ async def generate_drawing(
                 views,
                 pdf_path,
                 Path(filename).stem,
-                DrawingModel(scale=scale, sheet=sheet),
+                DrawingModel(
+                    scale=scale,
+                    sheet=sheet,
+                    projection_type=projection,
+                ),
             )
         except Exception as exc:
             raise HTTPException(

@@ -6,6 +6,7 @@ from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 
 from .model import DrawingModel
+from .projection import ProjectionType, orthographic_view_positions
 from .sheet import Sheet
 
 
@@ -31,6 +32,11 @@ def create_pdf(
     output_file = Path(output_file)
 
     sheet = drawing_model.sheet if drawing_model else Sheet()
+    projection_type = (
+        drawing_model.projection_type
+        if drawing_model
+        else ProjectionType.THIRD_ANGLE
+    )
     page_width = sheet.width_mm * mm
     page_height = sheet.height_mm * mm
     margin = 10 * mm
@@ -66,12 +72,13 @@ def create_pdf(
 
     view_width = 80 * mm
     view_height = 55 * mm
+    view_positions = orthographic_view_positions(sheet, projection_type)
 
     draw_svg(
         pdf,
         views["front"],
-        30 * mm,
-        105 * mm,
+        view_positions["front"][0] * mm,
+        view_positions["front"][1] * mm,
         view_width,
         view_height,
     )
@@ -79,8 +86,8 @@ def create_pdf(
     draw_svg(
         pdf,
         views["top"],
-        30 * mm,
-        40 * mm,
+        view_positions["top"][0] * mm,
+        view_positions["top"][1] * mm,
         view_width,
         view_height,
     )
@@ -88,8 +95,8 @@ def create_pdf(
     draw_svg(
         pdf,
         views["right"],
-        120 * mm,
-        105 * mm,
+        view_positions["right"][0] * mm,
+        view_positions["right"][1] * mm,
         view_width,
         view_height,
     )

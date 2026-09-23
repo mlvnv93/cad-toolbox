@@ -62,6 +62,7 @@ export default function DrawWorkbench() {
   const [partNumber, setPartNumber] = useState("PART-001");
   const [paperSize, setPaperSize] = useState("A4");
   const [orientation, setOrientation] = useState<"portrait" | "landscape">("portrait");
+  const [projectionType, setProjectionType] = useState("THIRD_ANGLE");
   const [exporting, setExporting] = useState(false);
 
   const addView = (view: ViewName) => {
@@ -105,6 +106,7 @@ export default function DrawWorkbench() {
       data.append("file", file);
       data.append("paper_size", paperSize);
       data.append("orientation", orientation);
+      data.append("projection_type", projectionType);
       const response = await fetch(`${process.env.NEXT_PUBLIC_DRAWING_API_URL}/drawings`, { method: "POST", body: data });
       if (!response.ok) throw new Error("Drawing export failed");
       const url = URL.createObjectURL(await response.blob());
@@ -151,7 +153,7 @@ export default function DrawWorkbench() {
               <SettingRow label="Orientation"><span className="draw-segmented"><button className={orientation === "portrait" ? "is-selected" : ""} type="button" onClick={() => setOrientation("portrait")}>Portrait</button><button className={orientation === "landscape" ? "is-selected" : ""} type="button" onClick={() => setOrientation("landscape")}>Landscape</button></span></SettingRow>
               <SettingRow label="Drawing scale"><select><option>Automatic · 1:1</option><option>1:2</option><option>1:5</option><option>1:10</option><option>2:1</option></select></SettingRow>
               <SettingRow label="Template"><select><option>CAD Toolbox — A3</option><option>Plain sheet</option></select></SettingRow>
-              <SettingRow label="Projection"><select><option>Third angle</option><option>First angle</option></select></SettingRow>
+              <SettingRow label="Projection"><select value={projectionType} onChange={(event) => setProjectionType(event.target.value)}><option value="THIRD_ANGLE">Third angle</option><option value="FIRST_ANGLE">First angle</option></select></SettingRow>
             </PanelSection>
             <PanelSection title="Line display">
               <SettingRow label="Line display"><select><option>Technical</option><option>Monochrome</option></select></SettingRow>

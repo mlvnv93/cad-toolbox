@@ -133,11 +133,11 @@ def test_convert_reports_conversion_failure(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 @pytest.mark.parametrize(
-    ("data", "expected_paper_size", "expected_orientation"),
+    ("data", "expected_paper_size", "expected_orientation", "expected_projection"),
     [
-        ({}, "A4", "portrait"),
-        ({"paper_size": "A4", "orientation": "landscape"}, "A4", "landscape"),
-        ({"paper_size": "A3", "orientation": "landscape"}, "A3", "landscape"),
+        ({}, "A4", "portrait", "THIRD_ANGLE"),
+        ({"paper_size": "A4", "orientation": "landscape", "projection_type": "FIRST_ANGLE"}, "A4", "landscape", "FIRST_ANGLE"),
+        ({"paper_size": "A3", "orientation": "landscape", "projection_type": "THIRD_ANGLE"}, "A3", "landscape", "THIRD_ANGLE"),
     ],
 )
 def test_drawings_pass_selected_sheet_to_existing_exporter(
@@ -145,6 +145,7 @@ def test_drawings_pass_selected_sheet_to_existing_exporter(
     data: dict[str, str],
     expected_paper_size: str,
     expected_orientation: str,
+    expected_projection: str,
 ) -> None:
     captured: dict[str, object] = {}
     monkeypatch.setattr(main, "import_step", lambda _: object())
@@ -169,6 +170,7 @@ def test_drawings_pass_selected_sheet_to_existing_exporter(
     drawing_model = captured["drawing_model"]
     assert drawing_model.sheet.paper_size == expected_paper_size
     assert drawing_model.sheet.orientation == expected_orientation
+    assert drawing_model.projection_type.value == expected_projection
 
 
 @pytest.mark.parametrize(
@@ -176,6 +178,7 @@ def test_drawings_pass_selected_sheet_to_existing_exporter(
     [
         ("paper_size", "A0", "Unsupported paper size"),
         ("orientation", "diagonal", "Unsupported orientation"),
+        ("projection_type", "SECOND_ANGLE", "Unsupported projection type"),
     ],
 )
 def test_drawings_reject_invalid_sheet_configuration(
