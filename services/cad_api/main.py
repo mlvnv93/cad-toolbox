@@ -25,11 +25,11 @@ from cad_drawing.conversion import (
 from cad_drawing.views import export_views
 from cad_drawing.pdf import create_pdf
 from cad_drawing.archive import bundle_archives, compress_cad_files
-from cad_drawing.drawing_views import drawing_document_from_views, drawing_preview_entities_from_views
+from cad_drawing.drawing_views import drawing_document_from_views, drawing_views_from_files
 from cad_drawing.dxf import write_dxf
 from cad_drawing.model import DrawingModel
 from cad_drawing.projection import ProjectionType
-from cad_drawing.scale import calculate_automatic_scale, scale_definition
+from cad_drawing.scale import DrawingArea, calculate_automatic_scale, scale_definition
 from cad_drawing.sheet import Sheet
 from services.cad_api.preview import serialize_drawing_preview
 
@@ -63,6 +63,15 @@ def _preview_entity(entity: object) -> dict[str, object]:
     return data
 
 
+def _preview_view(view: object) -> dict[str, object]:
+    data = asdict(view)
+    data["bounds"] = asdict(view.bounds)
+    data["position"] = asdict(view.position)
+    data["center"] = asdict(view.bounds.center)
+    data["entities"] = [_preview_entity(entity) for entity in view.entities]
+    return data
+
+
 @app.post("/drawings/preview")
 async def generate_drawing_preview(
     file: UploadFile = File(...),
@@ -89,20 +98,25 @@ async def generate_drawing_preview(
             model = import_step(step_path)
             views = export_views(model, temp_path / "views")
             bounding_box = calculate_bounding_box(model)
-            selected_scale = calculate_automatic_scale(bounding_box, sheet.drawing_area)
+            selected_scale = calculate_automatic_scale(
+                bounding_box,
+                DrawingArea(sheet.width_mm / 2, sheet.height_mm / 2),
+            )
             if scale != "automatic":
                 numerator, denominator = (int(value) for value in scale.split(":", 1))
                 selected_scale = scale_definition(numerator, denominator, bounding_box)
             drawing_model = DrawingModel(scale=selected_scale, sheet=sheet, projection_type=projection)
-            preview = drawing_preview_entities_from_views(views, drawing_model)
-        except (ValueError, RuntimeError) as exc:
+            preview = drawing_views_from_files(views, drawing_model)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except RuntimeError as exc:
             raise HTTPException(status_code=422, detail="This STEP file could not be opened.") from exc
     return {
         "units": "MM",
         "sheet": {"width_mm": sheet.width_mm, "height_mm": sheet.height_mm, "paper_size": sheet.paper_size},
         "scale": {"label": selected_scale.label, "factor": selected_scale.factor},
         "projection_type": projection.value,
-        "views": {name: {"entities": [_preview_entity(entity) for entity in entities]} for name, entities in preview.items()},
+        "views": {name: _preview_view(view) for name, view in preview.items()},
     }
 
 
@@ -312,7 +326,10 @@ async def generate_drawing(
             model = import_step(step_path)
             views = export_views(model, output_dir)
             bounding_box = calculate_bounding_box(model)
-            selected_scale = calculate_automatic_scale(bounding_box, sheet.drawing_area)
+            selected_scale = calculate_automatic_scale(
+                bounding_box,
+                DrawingArea(sheet.width_mm / 2, sheet.height_mm / 2),
+            )
             if scale != "automatic":
                 numerator, denominator = (int(value) for value in scale.split(":", 1))
                 selected_scale = scale_definition(numerator, denominator, bounding_box)
@@ -326,6 +343,8 @@ async def generate_drawing(
                     projection_type=projection,
                 ),
             )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         except Exception as exc:
             raise HTTPException(
                 status_code=500,
@@ -388,7 +407,10 @@ async def generate_dxf(
             model = import_step(step_path)
             views = export_views(model, output_dir)
             bounding_box = calculate_bounding_box(model)
-            selected_scale = calculate_automatic_scale(bounding_box, sheet.drawing_area)
+            selected_scale = calculate_automatic_scale(
+                bounding_box,
+                DrawingArea(sheet.width_mm / 2, sheet.height_mm / 2),
+            )
             if scale != "automatic":
                 numerator, denominator = (int(value) for value in scale.split(":", 1))
                 selected_scale = scale_definition(numerator, denominator, bounding_box)
@@ -397,8 +419,10 @@ async def generate_dxf(
                 sheet=sheet,
                 projection_type=projection,
             )
-            document = drawing_document_from_views(views, drawing_model)
+            document = drawing_document_from_views(views, drawing_model, validate_fit=True)
             write_dxf(document, dxf_path)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         except Exception as exc:
             raise HTTPException(
                 status_code=500,

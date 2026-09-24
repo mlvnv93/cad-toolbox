@@ -8,6 +8,7 @@ import ezdxf
 from fastapi.testclient import TestClient
 
 from services.cad_api import main
+from cad_drawing.drawing_ir import DrawingBounds, DrawingView, Point
 
 
 DRAWING_SCALE = SimpleNamespace(
@@ -184,8 +185,16 @@ def test_drawing_preview_returns_all_view_keys_and_sheet_metadata(
     monkeypatch.setattr(main, "calculate_bounding_box", lambda _: object())
     monkeypatch.setattr(main, "calculate_automatic_scale", lambda *_: scale)
     monkeypatch.setattr(main, "scale_definition", lambda *_: scale)
-    monkeypatch.setattr(main, "drawing_preview_entities_from_views", lambda *_: {
-        name: [] for name in ("front", "back", "left", "right", "top", "bottom", "isometric")
+    monkeypatch.setattr(main, "drawing_views_from_files", lambda *_: {
+        name: DrawingView(
+            name=name,
+            entities=(),
+            bounds=DrawingBounds(0, 0, 10, 10),
+            position=Point(20, 20),
+            scale=0.5,
+            projection_relationship="THIRD_ANGLE",
+        )
+        for name in ("front", "back", "left", "right", "top", "bottom", "isometric")
     })
 
     response = client.post(

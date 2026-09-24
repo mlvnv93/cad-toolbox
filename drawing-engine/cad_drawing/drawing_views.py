@@ -2,9 +2,9 @@ import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from .drawing_ir import DrawingDocument, LineEntity, Point
+from .drawing_ir import DrawingBounds, DrawingDocument, DrawingEntity, DrawingView, LineEntity, Point
 from .model import DrawingModel
-from .projection import orthographic_view_positions
+from .projection import VIEW_NAMES, calculate_view_placements
 
 
 _PATH_TOKEN = re.compile(r"([A-Za-z])|([-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?)")
@@ -82,13 +82,10 @@ def _path_elements(element: ET.Element, hidden: bool = False):
 def drawing_document_from_views(
     views: dict[str, Path],
     drawing_model: DrawingModel,
+    validate_fit: bool = False,
 ) -> DrawingDocument:
-    positions = orthographic_view_positions(
-        drawing_model.sheet,
-        drawing_model.projection_type,
-    )
-    view_entities = drawing_preview_entities_from_views(views, drawing_model)
-    entities = [entity for items in view_entities.values() for entity in items]
+    view_blocks = drawing_views_from_files(views, drawing_model, validate_fit=validate_fit)
+    entities = [entity for view in view_blocks.values() for entity in view.entities]
     layers = {entity.layer for entity in entities}
 
     return DrawingDocument(
@@ -105,33 +102,86 @@ def drawing_preview_entities_from_views(
     views: dict[str, Path],
     drawing_model: DrawingModel,
 ) -> dict[str, list[LineEntity]]:
-    positions = orthographic_view_positions(
+    return {name: list(view.entities) for name, view in drawing_views_from_files(views, drawing_model).items()}
+
+
+def _bounds(entities: list[DrawingEntity]) -> DrawingBounds:
+    points: list[Point] = []
+    for entity in entities:
+        if isinstance(entity, LineEntity):
+            points.extend((entity.start, entity.end))
+    if not points:
+        raise ValueError("Generated drawing view contains no supported geometry")
+    return DrawingBounds(
+        min_x=min(point.x for point in points),
+        min_y=min(point.y for point in points),
+        max_x=max(point.x for point in points),
+        max_y=max(point.y for point in points),
+    )
+
+
+def _translate(entity: DrawingEntity, offset: Point) -> DrawingEntity:
+    if isinstance(entity, LineEntity):
+        return LineEntity(
+            Point(entity.start.x + offset.x, entity.start.y + offset.y),
+            Point(entity.end.x + offset.x, entity.end.y + offset.y),
+            entity.layer,
+        )
+    return entity
+
+
+def _parse_view(view_name: str, path: Path, factor: float) -> list[LineEntity]:
+    root = ET.parse(path).getroot()
+    entities: list[LineEntity] = []
+    for element, hidden in _path_elements(root):
+        if not element.get("d"):
+            continue
+        parsed = _path_lines(element.get("d", ""))
+        if parsed is None:
+            continue
+        layer = "hidden" if hidden else "geometry"
+        entities.extend(
+            LineEntity(
+                start=Point(start.x * factor, start.y * factor),
+                end=Point(end.x * factor, end.y * factor),
+                layer=layer,
+            )
+            for start, end in parsed
+        )
+    return entities
+
+
+def drawing_views_from_files(
+    views: dict[str, Path],
+    drawing_model: DrawingModel,
+    validate_fit: bool = True,
+) -> dict[str, DrawingView]:
+    local_entities = {
+        name: _parse_view(name, path, drawing_model.scale.factor)
+        for name, path in views.items()
+        if name in VIEW_NAMES
+    }
+    local_bounds = {name: _bounds(entities) for name, entities in local_entities.items() if entities}
+    positions = calculate_view_placements(
+        local_bounds,
         drawing_model.sheet,
         drawing_model.projection_type,
+        validate_fit=validate_fit,
     )
-    preview: dict[str, list[LineEntity]] = {}
-    layers: set[str] = set()
-    for view_name in ("front", "back", "left", "right", "top", "bottom", "isometric"):
-        if view_name not in views:
+    placed: dict[str, DrawingView] = {}
+    for name, entities in local_entities.items():
+        if name not in positions:
             continue
-        root = ET.parse(views[view_name]).getroot()
-        offset_x, offset_y = positions[view_name]
-        entities: list[LineEntity] = []
-        for element, hidden in _path_elements(root):
-            if not element.get("d"):
-                continue
-            parsed = _path_lines(element.get("d", ""))
-            if parsed is None:
-                continue
-            layer = "hidden" if hidden else "geometry"
-            layers.add(layer)
-            for start, end in parsed:
-                entities.append(
-                    LineEntity(
-                        start=Point(offset_x + start.x * drawing_model.scale.factor, offset_y + start.y * drawing_model.scale.factor),
-                        end=Point(offset_x + end.x * drawing_model.scale.factor, offset_y + end.y * drawing_model.scale.factor),
-                        layer=layer,
-                    )
-                )
-        preview[view_name] = entities
-    return preview
+        local = local_bounds[name]
+        offset = Point(positions[name].x - local.center.x, positions[name].y - local.center.y)
+        placed_entities = tuple(_translate(entity, offset) for entity in entities)
+        placed_bounds = _bounds(list(placed_entities))
+        placed[name] = DrawingView(
+            name=name,
+            entities=placed_entities,
+            bounds=placed_bounds,
+            position=positions[name],
+            scale=drawing_model.scale.factor,
+            projection_relationship=drawing_model.projection_type.value,
+        )
+    return placed

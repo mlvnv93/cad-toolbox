@@ -5,6 +5,8 @@ from reportlab.graphics import renderPDF
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 
+from .drawing_ir import LineEntity
+from .drawing_views import drawing_views_from_files
 from .model import DrawingModel
 from .projection import ProjectionType, orthographic_view_positions
 from .sheet import Sheet
@@ -73,18 +75,28 @@ def create_pdf(
     view_width = 80 * mm
     view_height = 55 * mm
     view_positions = orthographic_view_positions(sheet, projection_type)
+    placed_views = None
+    if drawing_model is not None:
+        placed_views = drawing_views_from_files(views, drawing_model)
 
-    for view_name in ("front", "back", "left", "right", "top", "bottom", "isometric"):
-        if view_name not in views:
-            continue
-        draw_svg(
-            pdf,
-            views[view_name],
-            view_positions[view_name][0] * mm,
-            view_positions[view_name][1] * mm,
-            view_width,
-            view_height,
-        )
+    if placed_views:
+        for view in placed_views.values():
+            for entity in view.entities:
+                if isinstance(entity, LineEntity):
+                    pdf.setStrokeColorRGB(0.6, 0.6, 0.6) if entity.layer == "hidden" else pdf.setStrokeColorRGB(0, 0, 0)
+                    pdf.line(entity.start.x * mm, entity.start.y * mm, entity.end.x * mm, entity.end.y * mm)
+    else:
+        for view_name in ("front", "back", "left", "right", "top", "bottom", "isometric"):
+            if view_name not in views:
+                continue
+            draw_svg(
+                pdf,
+                views[view_name],
+                view_positions[view_name][0] * mm,
+                view_positions[view_name][1] * mm,
+                view_width,
+                view_height,
+            )
 
     block_x = 120 * mm
     block_y = 20 * mm

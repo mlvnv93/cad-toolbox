@@ -3,11 +3,15 @@ from pathlib import Path
 import pytest
 
 from cad_drawing.bounds import calculate_bounding_box
-from cad_drawing.scale import DrawingArea, calculate_automatic_scale, scale_definition
+from cad_drawing.scale import STANDARD_SCALES, DrawingArea, calculate_automatic_scale, scale_definition
 from cad_drawing.step import import_step
 
 
 STEP_FILE = Path(r"C:\Users\mlvnv\Downloads\800000182_1.stp")
+
+
+def test_standard_scale_table_contains_required_options() -> None:
+    assert STANDARD_SCALES == ((1, 1), (1, 2), (1, 3), (2, 1), (1, 10), (1, 15))
 
 
 def test_scale_from_imported_step_fits_drawing_area() -> None:
@@ -19,7 +23,7 @@ def test_scale_from_imported_step_fits_drawing_area() -> None:
         DrawingArea(width=250, height=180),
     )
 
-    assert result.label in {"1:1", "1:2", "1:5", "1:10", "2:1", "5:1"}
+    assert result.label in {"1:1", "1:2", "1:3", "1:10", "1:15", "2:1"}
     scaled_dimensions = sorted(
         (result.x_length, result.y_length, result.z_length),
         reverse=True,

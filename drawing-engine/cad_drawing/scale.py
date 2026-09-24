@@ -23,11 +23,10 @@ class ScaleResult:
 
 
 STANDARD_SCALES: tuple[tuple[int, int], ...] = (
-    (5, 1),
-    (2, 1),
     (1, 1),
     (1, 2),
-    (1, 5),
+    (1, 3),
+    (2, 1),
     (1, 10),
     (1, 15),
 )
@@ -68,7 +67,7 @@ def calculate_automatic_scale(
         reverse=True,
     )
     area_dimensions = sorted(
-        (drawing_area.width, drawing_area.height),
+        (drawing_area.width / 4, drawing_area.height / 3),
         reverse=True,
     )
 

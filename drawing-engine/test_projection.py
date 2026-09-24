@@ -5,7 +5,10 @@ import pytest
 from cad_drawing.bounds import calculate_bounding_box
 from cad_drawing.model import DrawingModel
 from cad_drawing.pdf import create_pdf
-from cad_drawing.projection import ProjectionType, orthographic_view_positions
+from cad_drawing.drawing_ir import DrawingBounds
+from cad_drawing.drawing_views import drawing_views_from_files
+from cad_drawing.scale import ScaleResult
+from cad_drawing.projection import ProjectionType, calculate_view_placements
 from cad_drawing.scale import calculate_automatic_scale
 from cad_drawing.sheet import Sheet
 from cad_drawing.step import import_step
@@ -51,13 +54,65 @@ def test_drawing_model_rejects_invalid_projection_type() -> None:
 
 def test_projection_types_reverse_orthographic_arrangement() -> None:
     sheet = Sheet()
-    third = orthographic_view_positions(sheet, ProjectionType.THIRD_ANGLE)
-    first = orthographic_view_positions(sheet, ProjectionType.FIRST_ANGLE)
+    bounds = {
+        "front": DrawingBounds(0, 0, 40, 30),
+        "top": DrawingBounds(0, 0, 30, 20),
+        "bottom": DrawingBounds(0, 0, 35, 18),
+        "left": DrawingBounds(0, 0, 25, 22),
+        "right": DrawingBounds(0, 0, 28, 24),
+    }
+    third = calculate_view_placements(bounds, sheet, ProjectionType.THIRD_ANGLE)
+    first = calculate_view_placements(bounds, sheet, ProjectionType.FIRST_ANGLE)
 
-    assert third["top"][1] > third["front"][1]
-    assert third["right"][0] > third["front"][0]
-    assert first["top"][1] < first["front"][1]
-    assert first["right"][0] < first["front"][0]
+    assert third["top"].x == third["front"].x
+    assert third["right"].y == third["front"].y
+    assert third["top"].y > third["front"].y
+    assert third["right"].x > third["front"].x
+    assert first["bottom"].x == first["front"].x
+    assert first["left"].y == first["front"].y
+    assert first["bottom"].y > first["front"].y
+    assert first["left"].x > first["front"].x
+
+
+def test_projection_spacing_uses_actual_view_bounds() -> None:
+    bounds = {
+        "front": DrawingBounds(0, 0, 100, 20),
+        "right": DrawingBounds(0, 0, 12, 20),
+    }
+
+    positions = calculate_view_placements(bounds, Sheet(), ProjectionType.THIRD_ANGLE)
+
+    assert positions["right"].x - positions["front"].x == pytest.approx(66)
+    assert positions["right"].y == positions["front"].y
+
+
+def test_generated_view_bounds_are_scaled_and_aligned_from_geometry(tmp_path: Path) -> None:
+    svg = '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0L100 0L100 50Z" /></svg>'
+    views = {}
+    for name in ("front", "top", "right"):
+        path = tmp_path / f"{name}.svg"
+        path.write_text(svg, encoding="utf-8")
+        views[name] = path
+
+    drawing_views = drawing_views_from_files(
+        views,
+        DrawingModel(
+            scale=ScaleResult(1, 2, 0.5, "1:2", 50, 25, 0, "MM"),
+            sheet=Sheet(paper_size="A3", orientation="landscape"),
+        ),
+    )
+
+    assert drawing_views["front"].bounds.width == pytest.approx(50)
+    assert drawing_views["front"].bounds.height == pytest.approx(25)
+    assert drawing_views["top"].position.x == pytest.approx(drawing_views["front"].position.x)
+    assert drawing_views["right"].position.y == pytest.approx(drawing_views["front"].position.y)
+
+
+def test_selected_scale_rejects_views_that_do_not_fit() -> None:
+    bounds = {"front": DrawingBounds(0, 0, 300, 300)}
+
+    with pytest.raises(ValueError, match="do not fit"):
+        calculate_view_placements(bounds, Sheet(), ProjectionType.THIRD_ANGLE)
 
 
 def test_export_views_returns_all_supported_view_keys(tmp_path: Path) -> None:
