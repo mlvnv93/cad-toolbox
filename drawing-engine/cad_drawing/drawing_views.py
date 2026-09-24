@@ -87,11 +87,36 @@ def drawing_document_from_views(
         drawing_model.sheet,
         drawing_model.projection_type,
     )
-    entities: list[LineEntity] = []
+    view_entities = drawing_preview_entities_from_views(views, drawing_model)
+    entities = [entity for items in view_entities.values() for entity in items]
+    layers = {entity.layer for entity in entities}
+
+    return DrawingDocument(
+        units="MM",
+        sheet_width_mm=drawing_model.sheet.width_mm,
+        sheet_height_mm=drawing_model.sheet.height_mm,
+        scale=drawing_model.scale.factor,
+        layers=tuple(sorted(layers)),
+        entities=tuple(entities),
+    )
+
+
+def drawing_preview_entities_from_views(
+    views: dict[str, Path],
+    drawing_model: DrawingModel,
+) -> dict[str, list[LineEntity]]:
+    positions = orthographic_view_positions(
+        drawing_model.sheet,
+        drawing_model.projection_type,
+    )
+    preview: dict[str, list[LineEntity]] = {}
     layers: set[str] = set()
     for view_name in ("front", "back", "left", "right", "top", "bottom", "isometric"):
+        if view_name not in views:
+            continue
         root = ET.parse(views[view_name]).getroot()
         offset_x, offset_y = positions[view_name]
+        entities: list[LineEntity] = []
         for element, hidden in _path_elements(root):
             if not element.get("d"):
                 continue
@@ -108,12 +133,5 @@ def drawing_document_from_views(
                         layer=layer,
                     )
                 )
-
-    return DrawingDocument(
-        units="MM",
-        sheet_width_mm=drawing_model.sheet.width_mm,
-        sheet_height_mm=drawing_model.sheet.height_mm,
-        scale=drawing_model.scale.factor,
-        layers=tuple(sorted(layers)),
-        entities=tuple(entities),
-    )
+        preview[view_name] = entities
+    return preview

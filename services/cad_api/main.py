@@ -1,4 +1,5 @@
 import base64
+from dataclasses import asdict
 from pathlib import Path
 import shutil
 import sys
@@ -24,7 +25,7 @@ from cad_drawing.conversion import (
 from cad_drawing.views import export_views
 from cad_drawing.pdf import create_pdf
 from cad_drawing.archive import bundle_archives, compress_cad_files
-from cad_drawing.drawing_views import drawing_document_from_views
+from cad_drawing.drawing_views import drawing_document_from_views, drawing_preview_entities_from_views
 from cad_drawing.dxf import write_dxf
 from cad_drawing.model import DrawingModel
 from cad_drawing.projection import ProjectionType
@@ -53,6 +54,56 @@ app.add_middleware(
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+def _preview_entity(entity: object) -> dict[str, object]:
+    data = asdict(entity)
+    if entity.__class__.__name__ == "LineEntity":
+        data["type"] = "LINE"
+    return data
+
+
+@app.post("/drawings/preview")
+async def generate_drawing_preview(
+    file: UploadFile = File(...),
+    paper_size: str = Form("A4"),
+    orientation: str = Form("portrait"),
+    projection_type: str = Form("THIRD_ANGLE"),
+    scale: str = Form("automatic"),
+    custom_width_mm: float | None = Form(None),
+    custom_height_mm: float | None = Form(None),
+):
+    filename = file.filename or ""
+    if not filename.lower().endswith((".step", ".stp")):
+        raise HTTPException(status_code=400, detail="Only STEP or STP files are supported.")
+    try:
+        sheet = Sheet(paper_size=paper_size, orientation=orientation, custom_width_mm=custom_width_mm, custom_height_mm=custom_height_mm)
+        projection = ProjectionType(projection_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        step_path = temp_path / Path(filename).name
+        step_path.write_bytes(await file.read())
+        try:
+            model = import_step(step_path)
+            views = export_views(model, temp_path / "views")
+            bounding_box = calculate_bounding_box(model)
+            selected_scale = calculate_automatic_scale(bounding_box, sheet.drawing_area)
+            if scale != "automatic":
+                numerator, denominator = (int(value) for value in scale.split(":", 1))
+                selected_scale = scale_definition(numerator, denominator, bounding_box)
+            drawing_model = DrawingModel(scale=selected_scale, sheet=sheet, projection_type=projection)
+            preview = drawing_preview_entities_from_views(views, drawing_model)
+        except (ValueError, RuntimeError) as exc:
+            raise HTTPException(status_code=422, detail="This STEP file could not be opened.") from exc
+    return {
+        "units": "MM",
+        "sheet": {"width_mm": sheet.width_mm, "height_mm": sheet.height_mm, "paper_size": sheet.paper_size},
+        "scale": {"label": selected_scale.label, "factor": selected_scale.factor},
+        "projection_type": projection.value,
+        "views": {name: {"entities": [_preview_entity(entity) for entity in entities]} for name, entities in preview.items()},
+    }
 
 
 @app.get("/convert/formats")

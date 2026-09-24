@@ -175,6 +175,33 @@ def test_drawings_pass_selected_sheet_to_existing_exporter(
     assert drawing_model.projection_type.value == expected_projection
 
 
+def test_drawing_preview_returns_all_view_keys_and_sheet_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scale = SimpleNamespace(label="1:2", factor=0.5)
+    monkeypatch.setattr(main, "import_step", lambda _: object())
+    monkeypatch.setattr(main, "export_views", lambda *_: {})
+    monkeypatch.setattr(main, "calculate_bounding_box", lambda _: object())
+    monkeypatch.setattr(main, "calculate_automatic_scale", lambda *_: scale)
+    monkeypatch.setattr(main, "scale_definition", lambda *_: scale)
+    monkeypatch.setattr(main, "drawing_preview_entities_from_views", lambda *_: {
+        name: [] for name in ("front", "back", "left", "right", "top", "bottom", "isometric")
+    })
+
+    response = client.post(
+        "/drawings/preview",
+        files={"file": ("part.step", b"valid STEP", "application/octet-stream")},
+        data={"paper_size": "Custom", "custom_width_mm": "120", "custom_height_mm": "240", "scale": "1:2"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body["views"]) == {"front", "back", "left", "right", "top", "bottom", "isometric"}
+    assert body["sheet"]["width_mm"] == 120
+    assert body["sheet"]["height_mm"] == 240
+    assert body["scale"]["factor"] == 0.5
+
+
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
