@@ -7,7 +7,7 @@ export function createDrawingExportRequest(
   paperSize: string,
   orientation: "portrait" | "landscape",
   projectionType: string,
-  scale: string,
+  scale = "automatic",
   customWidthMm?: number,
   customHeightMm?: number,
 ): { url: string; body: FormData; filenameExtension: DrawingExportFormat } {

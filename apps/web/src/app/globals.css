@@ -409,6 +409,8 @@ body { background: var(--background); color: var(--text-primary); transition: ba
 .drawing-workflow-hint { margin-left: auto; color: var(--text-muted); font-size: 10px; letter-spacing: .03em; }
 .drawing-workflow-hint b { padding: 0 8px; color: var(--accent-blue); font-size: 13px; font-weight: 500; }
 .drawing-workbench { display: grid; grid-template-columns: 258px minmax(420px, 1fr) 274px; grid-template-rows: minmax(600px, calc(100vh - 196px)) 74px; gap: 10px; max-width: 1680px; min-height: 680px; margin: 0 auto; padding: 12px clamp(10px, 2vw, 28px) 16px; }
+.drawing-workbench.is-fullscreen { position: fixed; inset: 0; z-index: 20; max-width: none; min-height: 100vh; background: var(--surface, #f4f1eb); }
+.drawing-grid-line { stroke: currentColor; stroke-width: .25; opacity: .35; }
 .drawing-panel { position: relative; min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); }
 .drawing-panel.is-collapsed { width: 34px; }
 .drawing-collapse { position: absolute; top: 10px; right: 8px; z-index: 2; display: grid; place-items: center; width: 24px; height: 24px; border: 1px solid var(--border); border-radius: 3px; background: var(--control-background); color: var(--text-primary); cursor: pointer; font-size: 17px; line-height: 1; }
