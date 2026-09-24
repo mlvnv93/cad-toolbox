@@ -8,6 +8,8 @@ const visibleStyle: CSSProperties = { stroke: "currentColor", strokeWidth: 1.25,
 const hiddenStyle: CSSProperties = { ...visibleStyle, strokeDasharray: "5 4", opacity: 0.55 };
 const SHEET_X = 35, SHEET_Y = 35, SHEET_W = 750, SHEET_H = 490;
 
+type GeometryPaths = { visible: string; hidden: string };
+
 function DrawingPreviewLayer({ preview, view, position, selected, onSelect, onPointerDown }: Props) {
   const sourceName = backendViewName[view];
   const entities = sourceName && preview?.views?.[sourceName] ? preview.views[sourceName] : [];
@@ -18,20 +20,27 @@ function DrawingPreviewLayer({ preview, view, position, selected, onSelect, onPo
   const sourcePx = { x: sheetOffsetX + sourceOrigin.x * fit, y: sheetOffsetY + sourceOrigin.y * fit };
   const delta = { x: position.x - sourcePx.x, y: position.y - sourcePx.y };
 
-  const geometry = useMemo(() => entities.map((entity, index) => {
-    if (entity.type !== "LINE") return null;
-    const x1 = sheetOffsetX + entity.start.x * fit;
-    const y1 = sheetOffsetY + entity.start.y * fit;
-    const x2 = sheetOffsetX + entity.end.x * fit;
-    const y2 = sheetOffsetY + entity.end.y * fit;
-    return <line key={`${view}-${index}`} x1={x1} y1={y1} x2={x2} y2={y2} style={entity.layer === "hidden" ? hiddenStyle : visibleStyle} />;
-  }), [entities, fit, sheetOffsetX, sheetOffsetY, view]);
+  const paths = useMemo<GeometryPaths>(() => {
+    const visible: string[] = [], hidden: string[] = [];
+    for (const entity of entities) {
+      if (entity.type !== "LINE") continue;
+      const x1 = sheetOffsetX + entity.start.x * fit;
+      const y1 = sheetOffsetY + entity.start.y * fit;
+      const x2 = sheetOffsetX + entity.end.x * fit;
+      const y2 = sheetOffsetY + entity.end.y * fit;
+      (entity.layer === "hidden" ? hidden : visible).push(`M ${x1} ${y1} L ${x2} ${y2}`);
+    }
+    return { visible: visible.join(" "), hidden: hidden.join(" ") };
+  }, [entities, fit, sheetOffsetX, sheetOffsetY]);
 
   if (!preview || !sourceName) return <g className={`sheet-view ${selected ? "is-selected" : ""}`} transform={`translate(${position.x} ${position.y})`} onClick={(event) => { event.stopPropagation(); onSelect(); }} onPointerDown={(event) => { event.stopPropagation(); onSelect(); onPointerDown(event); }}><rect className="sheet-view-hit" x="-80" y="-54" width="160" height="108" /><text className="view-label" x="0" y="0" textAnchor="middle">LOAD CAD</text><text className="view-label" x="0" y="20" textAnchor="middle">TO PREVIEW</text><text className="view-label" x="0" y="72" textAnchor="middle">{view.toUpperCase()}</text></g>;
 
   return <g className={`sheet-view ${selected ? "is-selected" : ""}`} onClick={(event) => { event.stopPropagation(); onSelect(); }} onPointerDown={(event) => { event.stopPropagation(); onSelect(); onPointerDown(event); }}>
     <rect className="sheet-view-hit" x={position.x - 80} y={position.y - 54} width={160} height={108} />
-    <g transform={`translate(${delta.x} ${delta.y})`}>{geometry}</g>
+    <g transform={`translate(${delta.x} ${delta.y})`}>
+      {paths.visible && <path d={paths.visible} style={visibleStyle} />}
+      {paths.hidden && <path d={paths.hidden} style={hiddenStyle} />}
+    </g>
     <text className="view-label" x={position.x} y={position.y + 72} textAnchor="middle">{view.toUpperCase()}</text>
   </g>;
 }
