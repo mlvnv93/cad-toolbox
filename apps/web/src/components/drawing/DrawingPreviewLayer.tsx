@@ -4,10 +4,10 @@ import type { DrawingPreview } from "./draw-preview";
 type ViewName = "Front" | "Back" | "Left" | "Right" | "Top" | "Bottom" | "Isometric";
 type Props = { preview: DrawingPreview | null; view: ViewName; position: { x: number; y: number }; selected: boolean; onSelect: () => void; onPointerDown: (event: ReactPointerEvent<SVGGElement>) => void };
 const backendViewName: Record<ViewName, "front" | "top" | "right" | null> = { Front: "front", Top: "top", Right: "right", Back: null, Left: null, Bottom: null, Isometric: null };
-const visibleStyle: CSSProperties = { stroke: "currentColor", strokeWidth: 1.25, fill: "none", vectorEffect: "non-scaling-stroke" };
-const hiddenStyle: CSSProperties = { ...visibleStyle, strokeDasharray: "5 4", opacity: 0.55 };
-const SHEET_X = 35, SHEET_Y = 35, SHEET_W = 750, SHEET_H = 490;
-const HIT_PADDING = 8, LABEL_GAP = 18;
+const visibleStyle: CSSProperties = { stroke: "currentColor", strokeWidth: 0.35, fill: "none", vectorEffect: "non-scaling-stroke" };
+const hiddenStyle: CSSProperties = { ...visibleStyle, strokeDasharray: "2.5 2", opacity: 0.55 };
+const HIT_PADDING = 2;
+const LABEL_GAP = 5;
 
 type GeometryPaths = { visible: string; hidden: string };
 type GeometryBounds = { minX: number; minY: number; maxX: number; maxY: number };
@@ -15,9 +15,6 @@ type GeometryBounds = { minX: number; minY: number; maxX: number; maxY: number }
 function DrawingPreviewLayer({ preview, view, position, selected, onSelect, onPointerDown }: Props) {
   const sourceName = backendViewName[view];
   const entities = sourceName && preview?.views?.[sourceName] ? preview.views[sourceName] : [];
-  const fit = preview ? Math.min(SHEET_W / preview.sheet_width_mm, SHEET_H / preview.sheet_height_mm) : 1;
-  const sheetOffsetX = preview ? SHEET_X + (SHEET_W - preview.sheet_width_mm * fit) / 2 : SHEET_X;
-  const sheetOffsetY = preview ? SHEET_Y + (SHEET_H - preview.sheet_height_mm * fit) / 2 : SHEET_Y;
 
   const geometry = useMemo(() => {
     if (!preview || !sourceName || entities.length === 0) return null;
@@ -26,10 +23,10 @@ function DrawingPreviewLayer({ preview, view, position, selected, onSelect, onPo
     const hidden: string[] = [];
     for (const entity of entities) {
       if (entity.type !== "LINE") continue;
-      const x1 = sheetOffsetX + entity.start.x * fit;
-      const y1 = sheetOffsetY + entity.start.y * fit;
-      const x2 = sheetOffsetX + entity.end.x * fit;
-      const y2 = sheetOffsetY + entity.end.y * fit;
+      const x1 = entity.start.x;
+      const y1 = entity.start.y;
+      const x2 = entity.end.x;
+      const y2 = entity.end.y;
       bounds.minX = Math.min(bounds.minX, x1, x2);
       bounds.minY = Math.min(bounds.minY, y1, y2);
       bounds.maxX = Math.max(bounds.maxX, x1, x2);
@@ -38,9 +35,9 @@ function DrawingPreviewLayer({ preview, view, position, selected, onSelect, onPo
     }
     if (!Number.isFinite(bounds.minX)) return null;
     return { paths: { visible: visible.join(" "), hidden: hidden.join(" ") } as GeometryPaths, bounds };
-  }, [entities, fit, sheetOffsetX, sheetOffsetY, preview, sourceName]);
+  }, [entities, preview, sourceName]);
 
-  if (!preview || !sourceName) return <g className={`sheet-view ${selected ? "is-selected" : ""}`} transform={`translate(${position.x} ${position.y})`} onClick={(event) => { event.stopPropagation(); onSelect(); }} onPointerDown={(event) => { event.stopPropagation(); onSelect(); onPointerDown(event); }}><rect className="sheet-view-hit" x="-80" y="-54" width="160" height="108" /><text className="view-label" x="0" y="0" textAnchor="middle">LOAD CAD</text><text className="view-label" x="0" y="20" textAnchor="middle">TO PREVIEW</text><text className="view-label" x="0" y="72" textAnchor="middle">{view.toUpperCase()}</text></g>;
+  if (!preview || !sourceName) return <g className={`sheet-view ${selected ? "is-selected" : ""}`} transform={`translate(${position.x} ${position.y})`} onClick={(event) => { event.stopPropagation(); onSelect(); }} onPointerDown={(event) => { event.stopPropagation(); onSelect(); onPointerDown(event); }}><rect className="sheet-view-hit" x="-30" y="-20" width="60" height="40" /><text className="view-label" x="0" y="0" textAnchor="middle">LOAD CAD</text><text className="view-label" x="0" y="7" textAnchor="middle">TO PREVIEW</text><text className="view-label" x="0" y="27" textAnchor="middle">{view.toUpperCase()}</text></g>;
   if (!geometry) return null;
 
   const { bounds, paths } = geometry;
@@ -50,8 +47,8 @@ function DrawingPreviewLayer({ preview, view, position, selected, onSelect, onPo
   const height = bounds.maxY - bounds.minY;
   const hitX = bounds.minX + delta.x - HIT_PADDING;
   const hitY = bounds.minY + delta.y - HIT_PADDING;
-  const hitWidth = Math.max(width + HIT_PADDING * 2, 24);
-  const hitHeight = Math.max(height + HIT_PADDING * 2, 24);
+  const hitWidth = Math.max(width + HIT_PADDING * 2, 8);
+  const hitHeight = Math.max(height + HIT_PADDING * 2, 8);
   const labelY = bounds.maxY + delta.y + LABEL_GAP;
 
   return <g className={`sheet-view ${selected ? "is-selected" : ""}`} onClick={(event) => { event.stopPropagation(); onSelect(); }} onPointerDown={(event) => { event.stopPropagation(); onSelect(); onPointerDown(event); }}>
