@@ -27,6 +27,12 @@ def _serialize_view(path: Path, offset_x: float, offset_y: float, scale: float) 
     return entities
 
 
+def _scale_label(factor: float) -> str:
+    if factor >= 1:
+        return f"{factor:g}:1"
+    return f"1:{1 / factor:g}"
+
+
 def serialize_drawing_preview(views: dict[str, Path], drawing_model: DrawingModel) -> dict:
     positions = orthographic_view_positions(drawing_model.sheet, drawing_model.projection_type)
     serialized_views = {
@@ -44,9 +50,12 @@ def serialize_drawing_preview(views: dict[str, Path], drawing_model: DrawingMode
 
     return {
         "units": "MM",
+        "paper_size": drawing_model.sheet.paper_size,
+        "orientation": drawing_model.sheet.orientation,
         "sheet_width_mm": drawing_model.sheet.width_mm,
         "sheet_height_mm": drawing_model.sheet.height_mm,
         "scale": drawing_model.scale.factor,
+        "scale_label": _scale_label(drawing_model.scale.factor),
         "layers": layers,
         "entities": all_entities,
         "views": serialized_views,
