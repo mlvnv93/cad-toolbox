@@ -36,6 +36,33 @@ def test_sheet_rejects_invalid_paper_size() -> None:
         Sheet(paper_size="A0")
 
 
+@pytest.mark.parametrize(
+    ("orientation", "expected"),
+    [("portrait", (120, 240)), ("landscape", (240, 120))],
+)
+def test_custom_sheet_dimensions_follow_orientation(
+    orientation: str,
+    expected: tuple[int, int],
+) -> None:
+    sheet = Sheet(
+        paper_size="Custom",
+        orientation=orientation,
+        custom_width_mm=120,
+        custom_height_mm=240,
+    )
+
+    assert (sheet.width_mm, sheet.height_mm) == expected
+
+
+def test_custom_sheet_rejects_missing_or_out_of_range_dimensions() -> None:
+    with pytest.raises(ValueError, match="requires width and height"):
+        Sheet(paper_size="Custom")
+    with pytest.raises(ValueError, match="at least 10 mm"):
+        Sheet(paper_size="Custom", custom_width_mm=9, custom_height_mm=100)
+    with pytest.raises(ValueError, match="exceed 5000 mm"):
+        Sheet(paper_size="Custom", custom_width_mm=100, custom_height_mm=5001)
+
+
 def test_sheet_rejects_invalid_orientation() -> None:
     with pytest.raises(ValueError, match="Unsupported orientation"):
         Sheet(orientation="diagonal")

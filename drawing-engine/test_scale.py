@@ -1,7 +1,9 @@
 from pathlib import Path
 
+import pytest
+
 from cad_drawing.bounds import calculate_bounding_box
-from cad_drawing.scale import DrawingArea, calculate_automatic_scale
+from cad_drawing.scale import DrawingArea, calculate_automatic_scale, scale_definition
 from cad_drawing.step import import_step
 
 
@@ -40,3 +42,22 @@ def test_scale_adapts_to_smaller_and_larger_areas() -> None:
     )
 
     assert small.factor <= large.factor
+
+
+@pytest.mark.parametrize(
+    ("label", "expected_factor"),
+    [("1:1", 1), ("1:2", 0.5), ("1:3", 1 / 3), ("2:1", 2), ("1:10", 0.1), ("1:15", 1 / 15)],
+)
+def test_explicit_scale_definitions_preserve_model_dimensions(
+    label: str,
+    expected_factor: float,
+) -> None:
+    model = import_step(STEP_FILE)
+    bounding_box = calculate_bounding_box(model)
+    numerator, denominator = (int(value) for value in label.split(":"))
+
+    result = scale_definition(numerator, denominator, bounding_box)
+
+    assert result.factor == pytest.approx(expected_factor)
+    assert result.x_length == pytest.approx(bounding_box.x_length * expected_factor)
+    assert bounding_box.x_length != result.x_length or expected_factor == 1

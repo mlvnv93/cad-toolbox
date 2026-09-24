@@ -28,7 +28,7 @@ from cad_drawing.drawing_views import drawing_document_from_views
 from cad_drawing.dxf import write_dxf
 from cad_drawing.model import DrawingModel
 from cad_drawing.projection import ProjectionType
-from cad_drawing.scale import calculate_automatic_scale
+from cad_drawing.scale import calculate_automatic_scale, scale_definition
 from cad_drawing.sheet import Sheet
 from services.cad_api.preview import serialize_drawing_preview
 
@@ -224,6 +224,9 @@ async def generate_drawing(
     paper_size: str = Form("A4"),
     orientation: str = Form("portrait"),
     projection_type: str = Form("THIRD_ANGLE"),
+    scale: str = Form("automatic"),
+    custom_width_mm: float | None = Form(None),
+    custom_height_mm: float | None = Form(None),
 ):
     filename = file.filename or ""
 
@@ -234,7 +237,7 @@ async def generate_drawing(
         )
 
     try:
-        sheet = Sheet(paper_size=paper_size, orientation=orientation)
+        sheet = Sheet(paper_size=paper_size, orientation=orientation, custom_width_mm=custom_width_mm, custom_height_mm=custom_height_mm)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     try:
@@ -257,16 +260,17 @@ async def generate_drawing(
         try:
             model = import_step(step_path)
             views = export_views(model, output_dir)
-            scale = calculate_automatic_scale(
-                calculate_bounding_box(model),
-                sheet.drawing_area,
-            )
+            bounding_box = calculate_bounding_box(model)
+            selected_scale = calculate_automatic_scale(bounding_box, sheet.drawing_area)
+            if scale != "automatic":
+                numerator, denominator = (int(value) for value in scale.split(":", 1))
+                selected_scale = scale_definition(numerator, denominator, bounding_box)
             create_pdf(
                 views,
                 pdf_path,
                 Path(filename).stem,
                 DrawingModel(
-                    scale=scale,
+                    scale=selected_scale,
                     sheet=sheet,
                     projection_type=projection,
                 ),
@@ -296,6 +300,9 @@ async def generate_dxf(
     paper_size: str = Form("A4"),
     orientation: str = Form("portrait"),
     projection_type: str = Form("THIRD_ANGLE"),
+    scale: str = Form("automatic"),
+    custom_width_mm: float | None = Form(None),
+    custom_height_mm: float | None = Form(None),
 ):
     filename = file.filename or ""
 
@@ -306,7 +313,7 @@ async def generate_dxf(
         )
 
     try:
-        sheet = Sheet(paper_size=paper_size, orientation=orientation)
+        sheet = Sheet(paper_size=paper_size, orientation=orientation, custom_width_mm=custom_width_mm, custom_height_mm=custom_height_mm)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     try:
@@ -329,12 +336,13 @@ async def generate_dxf(
         try:
             model = import_step(step_path)
             views = export_views(model, output_dir)
-            scale = calculate_automatic_scale(
-                calculate_bounding_box(model),
-                sheet.drawing_area,
-            )
+            bounding_box = calculate_bounding_box(model)
+            selected_scale = calculate_automatic_scale(bounding_box, sheet.drawing_area)
+            if scale != "automatic":
+                numerator, denominator = (int(value) for value in scale.split(":", 1))
+                selected_scale = scale_definition(numerator, denominator, bounding_box)
             drawing_model = DrawingModel(
-                scale=scale,
+                scale=selected_scale,
                 sheet=sheet,
                 projection_type=projection,
             )

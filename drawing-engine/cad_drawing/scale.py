@@ -29,7 +29,28 @@ STANDARD_SCALES: tuple[tuple[int, int], ...] = (
     (1, 2),
     (1, 5),
     (1, 10),
+    (1, 15),
 )
+
+
+def scale_definition(
+    numerator: int,
+    denominator: int,
+    bounding_box: BoundingBox,
+) -> ScaleResult:
+    if numerator <= 0 or denominator <= 0:
+        raise ValueError("Scale numerator and denominator must be positive")
+    factor = numerator / denominator
+    return ScaleResult(
+        numerator=numerator,
+        denominator=denominator,
+        factor=factor,
+        label=f"{numerator}:{denominator}",
+        x_length=bounding_box.x_length * factor,
+        y_length=bounding_box.y_length * factor,
+        z_length=bounding_box.z_length * factor,
+        unit=bounding_box.unit,
+    )
 
 
 def calculate_automatic_scale(
