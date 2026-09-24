@@ -7,8 +7,10 @@ const backendViewName: Record<ViewName, "front" | "top" | "right" | null> = { Fr
 const visibleStyle: CSSProperties = { stroke: "currentColor", strokeWidth: 1.25, fill: "none", vectorEffect: "non-scaling-stroke" };
 const hiddenStyle: CSSProperties = { ...visibleStyle, strokeDasharray: "5 4", opacity: 0.55 };
 const SHEET_X = 35, SHEET_Y = 35, SHEET_W = 750, SHEET_H = 490;
+const HIT_PADDING = 8, LABEL_GAP = 18;
 
 type GeometryPaths = { visible: string; hidden: string };
+type GeometryBounds = { minX: number; minY: number; maxX: number; maxY: number };
 
 function DrawingPreviewLayer({ preview, view, position, selected, onSelect, onPointerDown }: Props) {
   const sourceName = backendViewName[view];
@@ -16,32 +18,49 @@ function DrawingPreviewLayer({ preview, view, position, selected, onSelect, onPo
   const fit = preview ? Math.min(SHEET_W / preview.sheet_width_mm, SHEET_H / preview.sheet_height_mm) : 1;
   const sheetOffsetX = preview ? SHEET_X + (SHEET_W - preview.sheet_width_mm * fit) / 2 : SHEET_X;
   const sheetOffsetY = preview ? SHEET_Y + (SHEET_H - preview.sheet_height_mm * fit) / 2 : SHEET_Y;
-  const sourceOrigin = sourceName && preview ? preview.view_positions[sourceName] : { x: 0, y: 0 };
-  const sourcePx = { x: sheetOffsetX + sourceOrigin.x * fit, y: sheetOffsetY + sourceOrigin.y * fit };
-  const delta = { x: position.x - sourcePx.x, y: position.y - sourcePx.y };
 
-  const paths = useMemo<GeometryPaths>(() => {
-    const visible: string[] = [], hidden: string[] = [];
+  const geometry = useMemo(() => {
+    if (!preview || !sourceName || entities.length === 0) return null;
+    const bounds: GeometryBounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+    const visible: string[] = [];
+    const hidden: string[] = [];
     for (const entity of entities) {
       if (entity.type !== "LINE") continue;
       const x1 = sheetOffsetX + entity.start.x * fit;
       const y1 = sheetOffsetY + entity.start.y * fit;
       const x2 = sheetOffsetX + entity.end.x * fit;
       const y2 = sheetOffsetY + entity.end.y * fit;
+      bounds.minX = Math.min(bounds.minX, x1, x2);
+      bounds.minY = Math.min(bounds.minY, y1, y2);
+      bounds.maxX = Math.max(bounds.maxX, x1, x2);
+      bounds.maxY = Math.max(bounds.maxY, y1, y2);
       (entity.layer === "hidden" ? hidden : visible).push(`M ${x1} ${y1} L ${x2} ${y2}`);
     }
-    return { visible: visible.join(" "), hidden: hidden.join(" ") };
-  }, [entities, fit, sheetOffsetX, sheetOffsetY]);
+    if (!Number.isFinite(bounds.minX)) return null;
+    return { paths: { visible: visible.join(" "), hidden: hidden.join(" ") } as GeometryPaths, bounds };
+  }, [entities, fit, sheetOffsetX, sheetOffsetY, preview, sourceName]);
 
   if (!preview || !sourceName) return <g className={`sheet-view ${selected ? "is-selected" : ""}`} transform={`translate(${position.x} ${position.y})`} onClick={(event) => { event.stopPropagation(); onSelect(); }} onPointerDown={(event) => { event.stopPropagation(); onSelect(); onPointerDown(event); }}><rect className="sheet-view-hit" x="-80" y="-54" width="160" height="108" /><text className="view-label" x="0" y="0" textAnchor="middle">LOAD CAD</text><text className="view-label" x="0" y="20" textAnchor="middle">TO PREVIEW</text><text className="view-label" x="0" y="72" textAnchor="middle">{view.toUpperCase()}</text></g>;
+  if (!geometry) return null;
+
+  const { bounds, paths } = geometry;
+  const geometryCenter = { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
+  const delta = { x: position.x - geometryCenter.x, y: position.y - geometryCenter.y };
+  const width = bounds.maxX - bounds.minX;
+  const height = bounds.maxY - bounds.minY;
+  const hitX = bounds.minX + delta.x - HIT_PADDING;
+  const hitY = bounds.minY + delta.y - HIT_PADDING;
+  const hitWidth = Math.max(width + HIT_PADDING * 2, 24);
+  const hitHeight = Math.max(height + HIT_PADDING * 2, 24);
+  const labelY = bounds.maxY + delta.y + LABEL_GAP;
 
   return <g className={`sheet-view ${selected ? "is-selected" : ""}`} onClick={(event) => { event.stopPropagation(); onSelect(); }} onPointerDown={(event) => { event.stopPropagation(); onSelect(); onPointerDown(event); }}>
-    <rect className="sheet-view-hit" x={position.x - 80} y={position.y - 54} width={160} height={108} />
+    <rect className="sheet-view-hit" x={hitX} y={hitY} width={hitWidth} height={hitHeight} />
     <g transform={`translate(${delta.x} ${delta.y})`}>
       {paths.visible && <path d={paths.visible} style={visibleStyle} />}
       {paths.hidden && <path d={paths.hidden} style={hiddenStyle} />}
     </g>
-    <text className="view-label" x={position.x} y={position.y + 72} textAnchor="middle">{view.toUpperCase()}</text>
+    <text className="view-label" x={position.x} y={labelY} textAnchor="middle">{view.toUpperCase()}</text>
   </g>;
 }
 
