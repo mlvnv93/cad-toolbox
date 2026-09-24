@@ -8,9 +8,12 @@ type DrawingViewKey = "front" | "top" | "right";
 
 export type DrawingPreview = {
   units: string;
+  paper_size?: string;
+  orientation?: string;
   sheet_width_mm: number;
   sheet_height_mm: number;
   scale: number;
+  scale_label?: string;
   layers: string[];
   entities: DrawingPreviewEntity[];
   views: Record<DrawingViewKey, DrawingPreviewEntity[]>;
