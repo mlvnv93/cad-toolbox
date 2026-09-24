@@ -1,11 +1,11 @@
-import type { PointerEvent as ReactPointerEvent } from "react";
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import type { DrawingPreview } from "./draw-preview";
 
 type ViewName = "Front" | "Back" | "Left" | "Right" | "Top" | "Bottom" | "Isometric";
 type Props = { preview: DrawingPreview | null; view: ViewName; position: { x: number; y: number }; selected: boolean; onSelect: () => void; onPointerDown: (event: ReactPointerEvent<SVGGElement>) => void };
 const backendViewName: Record<ViewName, "front" | "top" | "right" | null> = { Front: "front", Top: "top", Right: "right", Back: null, Left: null, Bottom: null, Isometric: null };
-const visibleStyle = { stroke: "currentColor", strokeWidth: 1.25, fill: "none", vectorEffect: "non-scaling-stroke" };
-const hiddenStyle = { ...visibleStyle, strokeDasharray: "5 4", opacity: 0.55 };
+const visibleStyle: CSSProperties = { stroke: "currentColor", strokeWidth: 1.25, fill: "none", vectorEffect: "non-scaling-stroke" };
+const hiddenStyle: CSSProperties = { ...visibleStyle, strokeDasharray: "5 4", opacity: 0.55 };
 
 export default function DrawingPreviewLayer({ preview, view, position, selected, onSelect, onPointerDown }: Props) {
   const sourceName = backendViewName[view];
