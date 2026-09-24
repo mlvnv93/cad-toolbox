@@ -89,7 +89,7 @@ def drawing_document_from_views(
     )
     entities: list[LineEntity] = []
     layers: set[str] = set()
-    for view_name in ("front", "top", "right"):
+    for view_name in ("front", "back", "left", "right", "top", "bottom", "isometric"):
         root = ET.parse(views[view_name]).getroot()
         offset_x, offset_y = positions[view_name]
         for element, hidden in _path_elements(root):

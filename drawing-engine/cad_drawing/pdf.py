@@ -74,32 +74,17 @@ def create_pdf(
     view_height = 55 * mm
     view_positions = orthographic_view_positions(sheet, projection_type)
 
-    draw_svg(
-        pdf,
-        views["front"],
-        view_positions["front"][0] * mm,
-        view_positions["front"][1] * mm,
-        view_width,
-        view_height,
-    )
-
-    draw_svg(
-        pdf,
-        views["top"],
-        view_positions["top"][0] * mm,
-        view_positions["top"][1] * mm,
-        view_width,
-        view_height,
-    )
-
-    draw_svg(
-        pdf,
-        views["right"],
-        view_positions["right"][0] * mm,
-        view_positions["right"][1] * mm,
-        view_width,
-        view_height,
-    )
+    for view_name in ("front", "back", "left", "right", "top", "bottom", "isometric"):
+        if view_name not in views:
+            continue
+        draw_svg(
+            pdf,
+            views[view_name],
+            view_positions[view_name][0] * mm,
+            view_positions[view_name][1] * mm,
+            view_width,
+            view_height,
+        )
 
     block_x = 120 * mm
     block_y = 20 * mm

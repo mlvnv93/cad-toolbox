@@ -5,8 +5,12 @@ import cadquery as cq
 
 VIEW_DIRECTIONS = {
     "front": (0, 0, 1),
+    "back": (0, 0, -1),
     "top": (0, 1, 0),
+    "bottom": (0, -1, 0),
     "right": (1, 0, 0),
+    "left": (-1, 0, 0),
+    "isometric": (1, -1, 1),
 }
 
 

@@ -60,6 +60,15 @@ def test_projection_types_reverse_orthographic_arrangement() -> None:
     assert first["right"][0] < first["front"][0]
 
 
+def test_export_views_returns_all_supported_view_keys(tmp_path: Path) -> None:
+    model = import_step(STEP_FILE)
+
+    views = export_views(model, tmp_path / "views")
+
+    assert set(views) == {"front", "back", "left", "right", "top", "bottom", "isometric"}
+    assert all(path.exists() and path.stat().st_size > 0 for path in views.values())
+
+
 def test_first_angle_pdf_generation_succeeds(tmp_path: Path) -> None:
     model = import_step(STEP_FILE)
     views = export_views(model, tmp_path / "views")

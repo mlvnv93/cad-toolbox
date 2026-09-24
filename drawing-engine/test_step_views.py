@@ -10,8 +10,12 @@ model = cq.importers.importStep(str(STEP_FILE))
 
 views = {
     "front": (0, 0, 1),
-    "top": (0, 1, 0),
+    "back": (0, 0, -1),
+    "left": (-1, 0, 0),
     "right": (1, 0, 0),
+    "top": (0, 1, 0),
+    "bottom": (0, -1, 0),
+    "isometric": (1, -1, 1),
 }
 
 for name, direction in views.items():

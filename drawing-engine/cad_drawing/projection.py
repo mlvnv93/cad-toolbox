@@ -25,10 +25,18 @@ def orthographic_view_positions(
             "front": (right_x, front_y),
             "top": (left_x, bottom_y),
             "right": (left_x, front_y),
+            "left": (right_x + view_width + 10, front_y),
+            "back": (left_x, front_y - view_height - 10),
+            "bottom": (left_x, bottom_y - view_height - 10),
+            "isometric": (right_x, top_y),
         }
 
     return {
         "front": (left_x, front_y),
         "top": (left_x, top_y),
         "right": (right_x, front_y),
+        "left": (max(10, left_x - view_width - 10), front_y),
+        "back": (right_x, front_y - view_height - 10),
+        "bottom": (left_x, max(10, bottom_y - view_height - 10)),
+        "isometric": (right_x, top_y),
     }
