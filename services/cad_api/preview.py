@@ -1,30 +1,32 @@
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
-from cad_drawing.drawing_views import _path_elements, _path_lines
+from cad_drawing.drawing_views import _path_elements, _path_lines, drawing_views_from_files
 from cad_drawing.model import DrawingModel
-from cad_drawing.projection import orthographic_view_positions
 
 
-def _serialize_view(path: Path, offset_x: float, offset_y: float, scale: float) -> list[dict]:
-    root = ET.parse(path).getroot()
+def _serialize_view(view, scale: float) -> dict:
     entities = []
-    for element, hidden in _path_elements(root):
-        path_data = element.get("d")
-        if not path_data:
-            continue
-        parsed = _path_lines(path_data)
-        if parsed is None:
-            continue
-        layer = "hidden" if hidden else "geometry"
-        for start, end in parsed:
-            entities.append({
-                "type": "LINE",
-                "start": {"x": offset_x + start.x * scale, "y": offset_y + start.y * scale},
-                "end": {"x": offset_x + end.x * scale, "y": offset_y + end.y * scale},
-                "layer": layer,
-            })
-    return entities
+    for entity in view.entities:
+        entities.append({
+            "type": "LINE",
+            "start": {"x": entity.start.x, "y": entity.start.y},
+            "end": {"x": entity.end.x, "y": entity.end.y},
+            "layer": entity.layer,
+        })
+    bounds = view.bounds
+    return {
+        "entities": entities,
+        "bounds": {
+            "min_x": bounds.min_x,
+            "min_y": bounds.min_y,
+            "max_x": bounds.max_x,
+            "max_y": bounds.max_y,
+        },
+        "center": {"x": view.position.x, "y": view.position.y},
+        "position": {"x": view.position.x, "y": view.position.y},
+        "scale": scale,
+    }
 
 
 def _scale_label(factor: float) -> str:
@@ -34,18 +36,12 @@ def _scale_label(factor: float) -> str:
 
 
 def serialize_drawing_preview(views: dict[str, Path], drawing_model: DrawingModel) -> dict:
-    positions = orthographic_view_positions(drawing_model.sheet, drawing_model.projection_type)
+    placed_views = drawing_views_from_files(views, drawing_model, validate_fit=False)
     serialized_views = {
-        name: _serialize_view(
-            views[name],
-            positions[name][0],
-            positions[name][1],
-            drawing_model.scale.factor,
-        )
-        for name in ("front", "top", "right")
+        name: _serialize_view(view, drawing_model.scale.factor)
+        for name, view in placed_views.items()
     }
-
-    all_entities = [entity for view in serialized_views.values() for entity in view]
+    all_entities = [entity for view in serialized_views.values() for entity in view["entities"]]
     layers = sorted({entity["layer"] for entity in all_entities})
 
     return {
@@ -60,7 +56,7 @@ def serialize_drawing_preview(views: dict[str, Path], drawing_model: DrawingMode
         "entities": all_entities,
         "views": serialized_views,
         "view_positions": {
-            name: {"x": x, "y": y}
-            for name, (x, y) in positions.items()
+            name: {"x": view.position.x, "y": view.position.y}
+            for name, view in placed_views.items()
         },
     }

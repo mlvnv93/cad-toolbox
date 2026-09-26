@@ -48,6 +48,18 @@ def test_scale_adapts_to_smaller_and_larger_areas() -> None:
     assert small.factor <= large.factor
 
 
+def test_automatic_scale_prefers_largest_fitting_factor() -> None:
+    # The first fitting candidate by UI tuple order is not necessarily the
+    # largest factor because 2:1 is larger than 1:1.
+    from cad_drawing.bounds import BoundingBox
+
+    box = BoundingBox(0, 0, 0, 100, 100, 100, 100, 100, 100, "MM")
+    result = calculate_automatic_scale(box, DrawingArea(width=1000, height=800))
+
+    assert result.label == "2:1"
+    assert result.factor == pytest.approx(2.0)
+
+
 @pytest.mark.parametrize(
     ("label", "expected_factor"),
     [("1:1", 1), ("1:2", 0.5), ("1:3", 1 / 3), ("2:1", 2), ("1:10", 0.1), ("1:15", 1 / 15)],

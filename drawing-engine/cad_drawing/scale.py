@@ -22,6 +22,7 @@ class ScaleResult:
     unit: str
 
 
+# Keep the UI order stable; automatic selection sorts by actual factor.
 STANDARD_SCALES: tuple[tuple[int, int], ...] = (
     (1, 1),
     (1, 2),
@@ -56,7 +57,7 @@ def calculate_automatic_scale(
     bounding_box: BoundingBox,
     drawing_area: DrawingArea,
 ) -> ScaleResult:
-    """Return the largest standard scale that fits every principal view."""
+    """Return the largest standard scale that fits the available drawing area."""
     if bounding_box.unit != "MM" or drawing_area.unit != "MM":
         raise ValueError("Automatic drawing scale requires millimetre units")
     if drawing_area.width <= 0 or drawing_area.height <= 0:
@@ -71,7 +72,12 @@ def calculate_automatic_scale(
         reverse=True,
     )
 
-    for numerator, denominator in STANDARD_SCALES:
+    candidates = sorted(
+        STANDARD_SCALES,
+        key=lambda scale: scale[0] / scale[1],
+        reverse=True,
+    )
+    for numerator, denominator in candidates:
         factor = numerator / denominator
         if all(
             dimension * factor <= available

@@ -4,7 +4,14 @@ export type DrawingPreviewEntity =
   | { type: "ARC"; center: { x: number; y: number }; radius: number; start_angle: number; end_angle: number; layer: string }
   | { type: "TEXT"; position: { x: number; y: number }; text: string; height: number; layer: string };
 
-type DrawingViewKey = "front" | "top" | "right";
+type DrawingViewKey = "front" | "back" | "left" | "right" | "top" | "bottom" | "isometric";
+
+type DrawingPreviewView = {
+  entities: DrawingPreviewEntity[];
+  bounds: { min_x: number; min_y: number; max_x: number; max_y: number };
+  center: { x: number; y: number };
+  position: { x: number; y: number };
+};
 
 export type DrawingPreview = {
   units: string;
@@ -16,8 +23,8 @@ export type DrawingPreview = {
   scale_label?: string;
   layers: string[];
   entities: DrawingPreviewEntity[];
-  views: Record<DrawingViewKey, DrawingPreviewEntity[]>;
-  view_positions: Record<DrawingViewKey, { x: number; y: number }>;
+  views: Partial<Record<DrawingViewKey, DrawingPreviewView>>;
+  view_positions: Partial<Record<DrawingViewKey, { x: number; y: number }>>;
   model_loaded?: boolean;
   model_name?: string;
   model_bounds_mm?: { x: number; y: number; z: number };

@@ -2,6 +2,7 @@ import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from .coordinates import DrawingCoordinateSpace
 from .drawing_ir import DrawingBounds, DrawingDocument, DrawingEntity, DrawingView, LineEntity, Point
 from .model import DrawingModel
 from .projection import VIEW_NAMES, calculate_view_placements
@@ -130,7 +131,8 @@ def _translate(entity: DrawingEntity, offset: Point) -> DrawingEntity:
     return entity
 
 
-def _parse_view(view_name: str, path: Path, factor: float) -> list[LineEntity]:
+def _parse_view(view_name: str, path: Path, coordinate_space: DrawingCoordinateSpace) -> list[LineEntity]:
+    del view_name
     root = ET.parse(path).getroot()
     entities: list[LineEntity] = []
     for element, hidden in _path_elements(root):
@@ -140,14 +142,16 @@ def _parse_view(view_name: str, path: Path, factor: float) -> list[LineEntity]:
         if parsed is None:
             continue
         layer = "hidden" if hidden else "geometry"
-        entities.extend(
-            LineEntity(
-                start=Point(start.x * factor, start.y * factor),
-                end=Point(end.x * factor, end.y * factor),
-                layer=layer,
+        for start, end in parsed:
+            start_x, start_y = coordinate_space.point_to_drawing(start.x, start.y)
+            end_x, end_y = coordinate_space.point_to_drawing(end.x, end.y)
+            entities.append(
+                LineEntity(
+                    start=Point(start_x, start_y),
+                    end=Point(end_x, end_y),
+                    layer=layer,
+                )
             )
-            for start, end in parsed
-        )
     return entities
 
 
@@ -156,8 +160,9 @@ def drawing_views_from_files(
     drawing_model: DrawingModel,
     validate_fit: bool = True,
 ) -> dict[str, DrawingView]:
+    coordinate_space = DrawingCoordinateSpace(drawing_model.scale.factor)
     local_entities = {
-        name: _parse_view(name, path, drawing_model.scale.factor)
+        name: _parse_view(name, path, coordinate_space)
         for name, path in views.items()
         if name in VIEW_NAMES
     }
